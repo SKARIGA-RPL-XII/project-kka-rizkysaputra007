@@ -14,119 +14,58 @@ export default function DashboardPage() {
     message: "",
   });
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTarget, setModalTarget] = useState<"konsultasi" | "riwayat" | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const [userName, setUserName] = useState<string>("User");
 
   // Cek login
   const isLoggedIn = () => {
     return !!localStorage.getItem("token");
   };
 
-  // Toast function (durasi 5 detik)
+  // Toast function
   const showToast = (message: string) => {
     setToast({ show: true, message });
 
     setTimeout(() => {
       setToast({ show: false, message: "" });
-    }, 5000); // 5 detik
+    }, 3000);
   };
 
-  // NOTE: Tidak ada redirect otomatis
+  // Redirect jika belum login & ambil nama
   useEffect(() => {
     if (!isLoggedIn()) {
-      showToast("Silakan login terlebih dahulu untuk melanjutkan.");
+      router.replace("/login");
+    } else {
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        const user = JSON.parse(userData);
+        setUserName(user.name || "User");
+      }
     }
   }, []);
 
-  // Handle button click
-  const handleButtonClick = (target: "konsultasi" | "riwayat") => {
-    if (isLoggedIn()) {
-      router.push(target === "konsultasi" ? "/konsultasi" : "/riwayat");
-    } else {
-      setModalTarget(target);
-      setModalOpen(true);
-      showToast("Silakan login terlebih dahulu untuk melanjutkan.");
-    }
-  };
-
-  // Modal OK
-  const handleModalOk = () => {
-    setModalOpen(false);
-    router.push("/login");
+  // Logout
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    router.replace("/dashboard");
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
 
       {/* TOAST */}
-{toast.show && (
- <div className="fixed top-20 left z-50 animate-toast-in">
-    <div className="max-w-sm w-full bg-slate-900/80 border border-white/20 rounded-xl shadow-2xl backdrop-blur-md p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-        <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeWidth="2" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-      <div className="flex-1">
-        <p className="font-semibold">Perhatian</p>
-        <p className="text-sm text-white/70">{toast.message}</p>
-      </div>
-
-      {/* tombol OK */}
-      <button
-        onClick={() => setToast({ show: false, message: "" })}
-        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20"
-      >
-        OK
-      </button>
-    </div>
-  </div>
-)}
-
-
-      {/* MODAL LOGIN */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-slate-900/90 border border-white/20 rounded-3xl p-8 max-w-md w-full animate-page-in">
-            <div className="flex items-start justify-between gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-cyan-200"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeWidth="2"
-                    d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-
-              <div className="flex-1">
-                <h2 className="text-xl font-bold mb-2">Login Dulu</h2>
-                <p className="text-white/70 mb-4">
-                  Anda harus login terlebih dahulu untuk mengakses{" "}
-                  <span className="text-white font-semibold">
-                    {modalTarget === "konsultasi" ? "konsultasi" : "riwayat"}
-                  </span>.
-                </p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setModalOpen(false)}
-                    className="w-full px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    onClick={handleModalOk}
-                    className="w-full px-4 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 transition"
-                  >
-                    Login Sekarang
-                  </button>
-                </div>
-              </div>
+      {toast.show && (
+        <div className="fixed top-6 right-6 z-50 animate-toast-in">
+          <div className="max-w-sm w-full bg-slate-900/80 border border-white/20 rounded-xl shadow-2xl backdrop-blur-md p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeWidth="2" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold">Perhatian</p>
+              <p className="text-sm text-white/70">{toast.message}</p>
             </div>
           </div>
         </div>
@@ -135,24 +74,58 @@ export default function DashboardPage() {
       {/* HEADER */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/70 backdrop-blur-md border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="font-bold text-lg tracking-wide">
-            Health<span className="text-cyan-400">CareAI</span>
-          </h1>
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center">
+              <span className="text-cyan-400 font-bold">AI</span>
+            </div>
+            <div>
+              <h1 className="font-bold text-lg tracking-wide">
+                Health<span className="text-cyan-400">CareAI</span>
+              </h1>
+              <p className="text-xs text-white/60">
+                Dashboard
+              </p>
+            </div>
+          </div>
 
-          <div className="flex gap-3">
+          {/* Profil */}
+          <div className="relative">
             <button
-              onClick={() => router.push("/login")}
-              className="text-white/80 hover:text-white transition"
+              className="flex items-center gap-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full px-4 py-2 transition"
+              onClick={() => setOpen(!open)}
             >
-              Login
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeWidth="2" d="M12 12c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4zm0 2c-3.3 0-6 2.7-6 6v1h12v-1c0-3.3-2.7-6-6-6z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold">{userName}</p>
+                <p className="text-xs text-white/60">Akun</p>
+              </div>
+              <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeWidth="2" d="M6 9l6 6 6-6" />
+              </svg>
             </button>
 
-            <button
-              onClick={() => router.push("/register")}
-              className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-full text-sm shadow-lg transition animate-soft-pulse"
-            >
-              Sign Up
-            </button>
+            {/* Dropdown */}
+            {open && (
+              <div className="absolute right-0 mt-2 w-44 bg-slate-900/70 border border-white/10 rounded-xl shadow-2xl backdrop-blur-md overflow-hidden">
+                <button
+                  onClick={() => router.push("/profile")}
+                  className="w-full text-left px-4 py-3 hover:bg-white/10 transition"
+                >
+                  Profil
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-3 hover:bg-red-500/20 transition text-red-400"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -172,10 +145,8 @@ export default function DashboardPage() {
         <div className="relative z-10 max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
           <div className="space-y-6 opacity-0 animate-slide-up">
             <h1 className="text-4xl lg:text-5xl font-bold leading-tight">
-              Konsultasi Kesehatan <br />
-              <span className="text-cyan-400">
-                Cerdas, Cepat & Profesional
-              </span>
+              Selamat datang, <br />
+              <span className="text-cyan-400">{userName}</span>
             </h1>
 
             <p className="text-white/80 max-w-xl text-lg">
@@ -185,7 +156,9 @@ export default function DashboardPage() {
 
             <div className="flex gap-4">
               <button
-                onClick={() => handleButtonClick("konsultasi")}
+                onClick={() => {
+                  router.push("/konsultasi");
+                }}
                 className="relative px-6 py-3 bg-cyan-500 rounded-full 
                 hover:bg-cyan-400 transition shadow-xl 
                 before:absolute before:inset-0 before:rounded-full 
@@ -196,7 +169,7 @@ export default function DashboardPage() {
               </button>
 
               <button
-                onClick={() => handleButtonClick("riwayat")}
+                onClick={() => router.push("/history")}
                 className="px-6 py-3 bg-white/10 rounded-full 
                 hover:bg-white/20 border border-white/20 transition"
               >
@@ -214,7 +187,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* FOTO DOKTER */}
           <div className="hidden lg:flex justify-center opacity-0 animate-slide-up">
             <div className="bg-white/10 p-5 rounded-3xl border border-white/20 backdrop-blur-md shadow-2xl">
               <img

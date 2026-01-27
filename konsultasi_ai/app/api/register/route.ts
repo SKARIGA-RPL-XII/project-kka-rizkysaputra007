@@ -1,51 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcrypt";
-import pool from "@/lib/db";
+// app/api/register/route.ts
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { username, password } = body;
+export async function POST(req: Request) {
+  const body = await req.json();
 
-    if (!username || !password) {
-      return NextResponse.json(
-        { message: "Username dan password wajib diisi" },
-        { status: 400 }
-      );
-    }
-
-    // cek user sudah ada
-    const [rows]: any = await pool.query(
-      "SELECT id FROM users WHERE username = ?",
-      [username]
-    );
-
-    if (rows.length > 0) {
-      return NextResponse.json(
-        { message: "Username sudah digunakan" },
-        { status: 409 }
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await pool.query(
-      "INSERT INTO users (username, password) VALUES (?, ?)",
-      [username, hashedPassword]
-    );
-
+  // contoh validasi
+  if (!body.email || !body.password) {
     return NextResponse.json(
-      { message: "Registrasi berhasil" },
-      { status: 201 }
-    );
-
-  } catch (error: any) {
-    console.error("REGISTER ERROR:", error);
-
-    // ⬇️ INI PENTING (biar tidak kirim HTML)
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500 }
+      { success: false, message: "Email & password wajib diisi" },
+      { status: 400 }
     );
   }
+
+  return NextResponse.json({ success: true, message: "Register berhasil" });
 }
