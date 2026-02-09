@@ -6,397 +6,372 @@ import { useRouter } from "next/navigation";
 export default function DashboardPage() {
   const router = useRouter();
 
-  const BG_IMAGE = "/images/bg-dashboard.jpg";
-  const DOCTOR_IMAGE = "/images/doctor.jpg";
+  // Placeholder Images (Unsplash)
+  const BG_HERO = "https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=2072&auto=format&fit=crop";
+  const DOCTOR_IMAGE = "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop";
 
-  const [toast, setToast] = useState({
+  const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
     show: false,
     message: "",
   });
-
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTarget, setModalTarget] = useState<"konsultasi" | "riwayat" | null>(null);
 
   // Cek login
-  const isLoggedIn = () => {
-    return !!localStorage.getItem("token");
+  const isLoggedIn = () => !!localStorage.getItem("token");
+
+  const showToast = (message: string, type: "success" | "error" = "error") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type }), 4000);
   };
 
-  // Toast function (durasi 5 detik)
-  const showToast = (message: string) => {
-    setToast({ show: true, message });
-
-    setTimeout(() => {
-      setToast({ show: false, message: "" });
-    }, 5000); // 5 detik
-  };
-
-  // NOTE: Tidak ada redirect otomatis
   useEffect(() => {
     if (!isLoggedIn()) {
-      showToast("Silakan login terlebih dahulu untuk melanjutkan.");
+      // Optional: Auto toast when page loads if not logged in? 
+      // Better UX: Let user explore first, only toast when clicking restricted action.
     }
   }, []);
 
-  // Handle button click
   const handleButtonClick = (target: "konsultasi" | "riwayat") => {
     if (isLoggedIn()) {
       router.push(target === "konsultasi" ? "/konsultasi" : "/riwayat");
     } else {
       setModalTarget(target);
       setModalOpen(true);
-      showToast("Silakan login terlebih dahulu untuk melanjutkan.");
+      showToast("Anda harus login untuk akses fitur ini.", "error");
     }
   };
 
-  // Modal OK
   const handleModalOk = () => {
     setModalOpen(false);
     router.push("/login");
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
+    <>
+      {/* --- GLOBAL ANIMATIONS --- */}
+      <style jsx global>{`
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        @keyframes glow-pulse {
+          0%, 100% { box-shadow: 0 0 20px rgba(6,182,212,0.15); }
+          50% { box-shadow: 0 0 40px rgba(6,182,212,0.4); }
+        }
+        .animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
+        .animate-glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+      `}</style>
 
-      {/* TOAST */}
-{toast.show && (
- <div className="fixed top-20 left z-50 animate-toast-in">
-    <div className="max-w-sm w-full bg-slate-900/80 border border-white/20 rounded-xl shadow-2xl backdrop-blur-md p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-        <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeWidth="2" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-      <div className="flex-1">
-        <p className="font-semibold">Perhatian</p>
-        <p className="text-sm text-white/70">{toast.message}</p>
-      </div>
+      <div className="min-h-screen bg-slate-950 text-white selection:bg-cyan-500/30 overflow-x-hidden font-sans">
+        
+        {/* --- BACKGROUND DECORATION --- */}
+        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/10 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]" />
+        </div>
 
-      {/* tombol OK */}
-      <button
-        onClick={() => setToast({ show: false, message: "" })}
-        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl border border-white/20"
-      >
-        OK
-      </button>
-    </div>
-  </div>
-)}
+        {/* --- TOAST NOTIFICATION --- */}
+        {toast.show && (
+          <div className="fixed top-6 right-6 z-[60] animate-bounce-in">
+            <div className={`px-5 py-4 rounded-2xl shadow-2xl backdrop-blur-xl border border-white/10 flex items-center gap-3 min-w-[300px] ${toast.type === 'error' ? 'bg-red-900/80' : 'bg-green-900/80'}`}>
+              <div className={`p-2 rounded-full ${toast.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                {toast.type === 'error' ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold">{toast.message}</p>
+              </div>
+              <button onClick={() => setToast({ show: false, message: "" })} className="text-white/50 hover:text-white">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+          </div>
+        )}
 
-
-      {/* MODAL LOGIN */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-slate-900/90 border border-white/20 rounded-3xl p-8 max-w-md w-full animate-page-in">
-            <div className="flex items-start justify-between gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-cyan-200"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+        {/* --- MODAL LOGIN --- */}
+        {modalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity opacity-100">
+            <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl transform scale-100 transition-transform">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-full flex items-center justify-center mb-4 border border-white/10 animate-glow-pulse">
+                  <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <h3 className="text-xl font-bold mb-2">Akses Terbatas</h3>
+                <p className="text-slate-400 text-sm">
+                  Fitur <span className="text-cyan-400 font-semibold">{modalTarget}</span> memerlukan autentikasi pengguna.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-medium transition-colors border border-white/5"
                 >
-                  <path
-                    strokeWidth="2"
-                    d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                  Batal
+                </button>
+                <button
+                  onClick={handleModalOk}
+                  className="py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-sm font-bold shadow-lg shadow-cyan-500/20 transition-all"
+                >
+                  Login
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- HEADER --- */}
+        <header className="fixed top-0 left-0 right-0 z-40 border-b border-white/5 bg-slate-950/80 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push("/")}>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-sm shadow-lg shadow-cyan-500/20">AI</div>
+              <span className="font-bold text-lg tracking-tight">Health<span className="text-cyan-400">CareAI</span></span>
+            </div>
+
+            <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+              <a href="#" className="hover:text-white transition-colors">Beranda</a>
+              <a href="#fitur" className="hover:text-white transition-colors">Fitur</a>
+              <a href="#cara-kerja" className="hover:text-white transition-colors">Cara Kerja</a>
+            </nav>
+
+            <div className="flex items-center gap-4">
+              <button onClick={() => router.push("/login")} className="text-sm font-medium hover:text-cyan-400 transition-colors">
+                Masuk
+              </button>
+              <button
+                onClick={() => router.push("/register")}
+                className="px-5 py-2.5 rounded-full bg-white text-slate-950 text-sm font-bold hover:bg-cyan-50 hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+              >
+                Daftar
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* --- HERO SECTION --- */}
+        <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            
+            {/* Text Content */}
+            <div className="space-y-8 relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                Teknologi Kesehatan Masa Depan
+              </div>
+              
+              <h1 className="text-5xl lg:text-7xl font-extrabold leading-tight tracking-tight">
+                Solusi Kesehatan <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
+                  Berbasis AI Cerdas
+                </span>
+              </h1>
+
+              <p className="text-lg text-slate-400 max-w-lg leading-relaxed">
+                Dapatkan diagnosa awal yang akurat dan konsultasi dengan dokter profesional dalam satu platform terintegrasi yang aman dan privasi terjaga.
+              </p>
+
+              <div className="flex flex-wrap gap-4 pt-4">
+                <button
+                  onClick={() => handleButtonClick("konsultasi")}
+                  className="group relative px-8 py-4 bg-cyan-500 rounded-2xl text-white font-bold text-lg overflow-hidden shadow-[0_0_40px_-10px_rgba(6,182,212,0.5)] hover:shadow-[0_0_60px_-10px_rgba(6,182,212,0.7)] hover:-translate-y-1 transition-all"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+                  Mulai Konsultasi
+                </button>
+                
+                <button
+                  onClick={() => handleButtonClick("riwayat")}
+                  className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 hover:border-white/20 transition-all backdrop-blur-sm"
+                >
+                  Lihat Riwayat
+                </button>
               </div>
 
-              <div className="flex-1">
-                <h2 className="text-xl font-bold mb-2">Login Dulu</h2>
-                <p className="text-white/70 mb-4">
-                  Anda harus login terlebih dahulu untuk mengakses{" "}
-                  <span className="text-white font-semibold">
-                    {modalTarget === "konsultasi" ? "konsultasi" : "riwayat"}
-                  </span>.
-                </p>
+              <div className="flex items-center gap-6 pt-6 border-t border-white/10">
+                <div>
+                  <p className="text-3xl font-bold text-white">10k+</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Pengguna Aktif</p>
+                </div>
+                <div className="h-10 w-px bg-white/10"></div>
+                <div>
+                  <p className="text-3xl font-bold text-white">4.9</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Rating Aplikasi</p>
+                </div>
+                <div className="h-10 w-px bg-white/10"></div>
+                <div>
+                  <p className="text-3xl font-bold text-white">24/7</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Layanan AI</p>
+                </div>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setModalOpen(false)}
-                    className="w-full px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    onClick={handleModalOk}
-                    className="w-full px-4 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 transition"
-                  >
-                    Login Sekarang
-                  </button>
+            {/* Image Content */}
+            <div className="relative lg:h-[600px] flex items-center justify-center">
+              {/* Background Glow */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/20 to-purple-600/20 blur-[100px] rounded-full opacity-50"></div>
+              
+              {/* Main Card */}
+              <div className="relative w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl p-4 shadow-2xl animate-float-slow">
+                <div className="relative overflow-hidden rounded-2xl aspect-[4/5] group">
+                  <img 
+                    src={DOCTOR_IMAGE} 
+                    alt="Healthcare AI" 
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                  />
+                  {/* Overlay Info */}
+                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 to-transparent">
+                    <div className="flex items-center gap-3 mb-2">
+                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                       <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Dokter Online</span>
+                    </div>
+                    <h3 className="text-xl font-bold">dr. Sarah Wijaya</h3>
+                    <p className="text-sm text-slate-300">Spesialis Penyakit Dalam</p>
+                  </div>
+                </div>
+                
+                {/* Floating Badge */}
+                <div className="absolute -top-6 -right-6 bg-white text-slate-950 p-4 rounded-2xl shadow-xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-100 p-2 rounded-full">
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-bold">Verifikasi</p>
+                      <p className="text-sm font-bold">Terlisensi</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </section>
 
-      {/* HEADER */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/70 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="font-bold text-lg tracking-wide">
-            Health<span className="text-cyan-400">CareAI</span>
-          </h1>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.push("/login")}
-              className="text-white/80 hover:text-white transition"
-            >
-              Login
-            </button>
-
-            <button
-              onClick={() => router.push("/register")}
-              className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-full text-sm shadow-lg transition animate-soft-pulse"
-            >
-              Sign Up
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* HERO */}
-      <section
-        className="relative min-h-screen flex items-center pt-24 animate-page-in"
-        style={{
-          backgroundImage: `linear-gradient(135deg, rgba(15,23,42,.85), rgba(2,132,199,.35)), url(${BG_IMAGE})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundAttachment: "fixed",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/40" />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
-          <div className="space-y-6 opacity-0 animate-slide-up">
-            <h1 className="text-4xl lg:text-5xl font-bold leading-tight">
-              Konsultasi Kesehatan <br />
-              <span className="text-cyan-400">
-                Cerdas, Cepat & Profesional
-              </span>
-            </h1>
-
-            <p className="text-white/80 max-w-xl text-lg">
-              Platform konsultasi kesehatan dengan
-              <b> AI cerdas </b> dan <b>dokter profesional</b>.
-            </p>
-
-            <div className="flex gap-4">
-              <button
-                onClick={() => handleButtonClick("konsultasi")}
-                className="relative px-6 py-3 bg-cyan-500 rounded-full 
-                hover:bg-cyan-400 transition shadow-xl 
-                before:absolute before:inset-0 before:rounded-full 
-                before:bg-cyan-400/40 before:blur before:opacity-0 
-                hover:before:opacity-100"
-              >
-                Mulai Konsultasi
-              </button>
-
-              <button
-                onClick={() => handleButtonClick("riwayat")}
-                className="px-6 py-3 bg-white/10 rounded-full 
-                hover:bg-white/20 border border-white/20 transition"
-              >
-                Riwayat
-              </button>
+        {/* --- FEATURES SECTION --- */}
+        <section id="fitur" className="py-24 relative">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Fitur Unggulan</h2>
+              <p className="text-slate-400 max-w-2xl mx-auto">Kami menggabungkan kecerdasan buatan dengan sentuhan manusia untuk memberikan perawatan kesehatan terbaik.</p>
             </div>
 
-            <div className="bg-white/10 border border-white/20 rounded-xl p-5 max-w-xl">
-              <ul className="list-disc pl-5 space-y-1 text-sm">
-                <li>Analisa gejala awal</li>
-                <li>Ringkasan kondisi</li>
-                <li>Rekomendasi tindakan</li>
-                <li>Bahasa medis mudah dipahami</li>
-              </ul>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { icon: "🤖", title: "Analisa AI Cepat", desc: "Dapatkan ringkasan gejala dan kemungkinan diagnosa dalam hitungan detik." },
+                { icon: "👨‍⚕️", title: "Dokter Profesional", desc: "Konsultasi langsung dengan dokter spesialis yang tersertifikasi." },
+                { icon: "🔒", title: "Data Privat & Aman", desc: "Data kesehatan Anda dienkripsi dan tidak dibagikan kepada pihak ketiga." },
+              ].map((item, idx) => (
+                <div key={idx} className="group p-8 rounded-3xl bg-slate-900/40 border border-white/5 hover:border-cyan-500/30 hover:bg-slate-900/60 transition-all duration-300 hover:-translate-y-2">
+                  <div className="text-4xl mb-6 group-hover:scale-110 transition-transform duration-300 origin-left">{item.icon}</div>
+                  <h3 className="text-xl font-bold mb-3 group-hover:text-cyan-400 transition-colors">{item.title}</h3>
+                  <p className="text-slate-400 leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
             </div>
           </div>
+        </section>
 
-          {/* FOTO DOKTER */}
-          <div className="hidden lg:flex justify-center opacity-0 animate-slide-up">
-            <div className="bg-white/10 p-5 rounded-3xl border border-white/20 backdrop-blur-md shadow-2xl">
-              <img
-                src={DOCTOR_IMAGE}
-                alt="Doctor"
-                className="w-80 rounded-3xl shadow-xl animate-float animate-soft-pulse"
-              />
+        {/* --- HOW IT WORKS --- */}
+        <section id="cara-kerja" className="py-24 bg-slate-900/30 border-y border-white/5">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <div>
+                <h2 className="text-3xl font-bold mb-6">Cara Kerja Sistem Kami</h2>
+                <div className="space-y-8">
+                  {[
+                    { step: "01", title: "Input Keluhan", text: "Tuliskan gejala yang Anda rasakan melalui kolom chat cerdas." },
+                    { step: "02", title: "Proses AI", text: "Sistem AI kami menganalisis data kesehatan Anda dan memberikan pre-diagnosa." },
+                    { step: "03", title: "Konsultasi Dokter", text: "Terhubung dengan dokter untuk verifikasi dan resep obat (jika diperlukan)." },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex gap-6">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold">
+                        {item.step}
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-bold text-white mb-1">{item.title}</h4>
+                        <p className="text-slate-400">{item.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="relative">
+                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 blur-[80px]"></div>
+                 <div className="relative bg-slate-800/50 rounded-3xl border border-white/10 p-8 backdrop-blur-sm">
+                   {/* Mock UI of Chat */}
+                   <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex-shrink-0"></div>
+                        <div className="bg-slate-700/50 p-4 rounded-2xl rounded-tl-none max-w-[80%]">
+                          <p className="text-sm text-slate-200">Halo, saya merasa pusing dan mual sejak pagi ini.</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 flex-row-reverse">
+                        <div className="w-8 h-8 rounded-full bg-cyan-500 flex-shrink-0 flex items-center justify-center font-bold text-xs">AI</div>
+                        <div className="bg-cyan-500/10 border border-cyan-500/20 p-4 rounded-2xl rounded-tr-none max-w-[80%]">
+                          <p className="text-sm text-cyan-100">Berdasarkan gejala, kemungkinan adalah <span className="font-bold text-white">Migrain</span> atau <span className="font-bold text-white">Vertigo</span>. Saran saya, istirahat sejenak.</p>
+                        </div>
+                      </div>
+                   </div>
+                 </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* MAIN */}
-      <section className="py-20">
-        <div className="max-w-6xl mx-auto px-6 space-y-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <InfoBox
-              title="Tentang Platform"
-              text="Konsultasi kesehatan modern berbasis AI dan verifikasi dokter profesional."
-            />
-            <InfoBox
-              title="Fitur Utama"
-              list={[
-                "Chat dokter",
-                "Ringkasan AI",
-                "Riwayat konsultasi",
-                "Notifikasi kesehatan",
-              ]}
-            />
-          </div>
+        {/* --- FOOTER --- */}
+        <footer className="bg-slate-950 border-t border-white/5 pt-16 pb-8">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+              <div className="col-span-1 md:col-span-2">
+                <div className="flex items-center gap-2 mb-4">
+                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-sm">AI</div>
+                   <span className="font-bold text-xl tracking-tight">HealthCareAI</span>
+                </div>
+                <p className="text-slate-400 max-w-sm mb-6">
+                  Mewujudkan layanan kesehatan yang dapat diakses oleh siapa saja, kapan saja, dan di mana saja dengan bantuan teknologi kecerdasan buatan.
+                </p>
+                <div className="flex gap-4">
+                   {[1,2,3].map((i) => (
+                     <div key={i} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-cyan-500 hover:text-white transition-colors flex items-center justify-center text-slate-400">
+                       {i === 1 ? "IG" : i === 2 ? "TW" : "FB"}
+                     </div>
+                   ))}
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-bold mb-4 text-white">Platform</h4>
+                <ul className="space-y-2 text-slate-400 text-sm">
+                  <li><a href="#" className="hover:text-cyan-400 transition-colors">Tentang Kami</a></li>
+                  <li><a href="#" className="hover:text-cyan-400 transition-colors">Karir</a></li>
+                  <li><a href="#" className="hover:text-cyan-400 transition-colors">Blog Kesehatan</a></li>
+                </ul>
+              </div>
 
-          <div className="bg-slate-900/60 p-10 rounded-2xl border border-white/10 opacity-0 animate-slide-up">
-            <h2 className="text-2xl font-bold mb-6">Cara Kerja AI</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Step title="Input Gejala" desc="Masukkan keluhan kesehatan." />
-              <Step title="Analisa AI" desc="AI memberi ringkasan awal." />
-              <Step title="Dokter" desc="Dokter verifikasi & solusi." />
+              <div>
+                <h4 className="font-bold mb-4 text-white">Kontak</h4>
+                <ul className="space-y-2 text-slate-400 text-sm">
+                  <li>help@healthcareai.com</li>
+                  <li>+62 812 3456 7890</li>
+                  <li>Jl. Teknologi No. 10, Jakarta</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
+              <p>© 2026 HealthCareAI. All rights reserved.</p>
+              <div className="flex gap-6">
+                <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+                <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+              </div>
             </div>
           </div>
+        </footer>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card title="Chat Dokter" desc="Konsultasi langsung" icon={IconChat} />
-            <Card title="Pesan" desc="Notifikasi" icon={IconBell} />
-            <Card title="Berita" desc="Info kesehatan" icon={IconNews} />
-            <Card title="Dokter" desc="Daftar dokter" icon={IconDoctor} />
-          </div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="bg-slate-900 border-t border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-10 text-white/80">
-          <div>
-            <h3 className="font-bold text-lg mb-2">
-              Health<span className="text-cyan-400">CareAI</span>
-            </h3>
-            <p className="text-sm">
-              Konsultasi kesehatan berbasis AI dan dokter profesional.
-            </p>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-2">Alamat</h4>
-            <p className="text-sm">
-              Jl. Kesehatan Digital No.21<br />
-              Kota Malang, Indonesia
-            </p>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-2">Media Sosial</h4>
-            <div className="flex gap-4">
-              <SocialIcon icon={IconInstagram} />
-              <SocialIcon icon={IconTwitter} />
-              <SocialIcon icon={IconFacebook} />
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center text-xs text-white/50 py-4 border-t border-white/10">
-          © 2026 HealthCareAI
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-/* ================= COMPONENT ================= */
-
-function Card({ title, desc, icon }: any) {
-  return (
-    <div className="group bg-slate-900/60 p-6 rounded-2xl border border-white/10 
-    opacity-0 animate-slide-up hover:-translate-y-2 
-    hover:shadow-cyan-500/10 transition-all duration-300">
-      <div className="w-10 h-10 bg-cyan-500/20 rounded-lg 
-      flex items-center justify-center mb-4 
-      group-hover:rotate-6 group-hover:scale-110 transition">
-        {icon}
       </div>
-      <h3 className="font-semibold">{title}</h3>
-      <p className="text-sm text-white/70">{desc}</p>
-    </div>
+    </>
   );
 }
-
-function InfoBox({ title, text, list }: any) {
-  return (
-    <div className="bg-slate-900/60 p-10 rounded-2xl border border-white/10 opacity-0 animate-slide-up">
-      <h2 className="text-2xl font-bold mb-4">{title}</h2>
-      {text && <p className="text-white/80">{text}</p>}
-      {list && (
-        <ul className="list-disc pl-5 space-y-2 text-white/80">
-          {list.map((i: string) => (
-            <li key={i}>{i}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function Step({ title, desc }: any) {
-  return (
-    <div className="p-6 bg-slate-900/40 rounded-xl border border-white/10 opacity-0 animate-slide-up">
-      <h3 className="font-semibold">{title}</h3>
-      <p className="text-sm text-white/70">{desc}</p>
-    </div>
-  );
-}
-
-function SocialIcon({ icon }: any) {
-  return (
-    <div className="w-10 h-10 flex items-center justify-center rounded-full 
-    bg-white/10 hover:bg-cyan-500/20 
-    hover:-translate-y-1 hover:scale-110 
-    transition-all duration-300 cursor-pointer">
-      {icon}
-    </div>
-  );
-}
-
-/* ================= ICON ================= */
-
-const IconChat = (
-  <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeWidth="2" d="M21 12c0 3.8-3.6 7-8 7a9.4 9.4 0 01-4-.9L3 20l1.9-5.1A7.9 7.9 0 013 12c0-3.8 3.6-7 8-7s8 3.2 8 7z" />
-  </svg>
-);
-
-const IconBell = (
-  <svg className="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeWidth="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14V11a6 6 0 00-12 0v3a2 2 0 01-.6 1.4L4 17h5m4 0a3 3 0 006 0" />
-  </svg>
-);
-
-const IconNews = (
-  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2z" />
-  </svg>
-);
-
-const IconDoctor = (
-  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeWidth="2" d="M12 11c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4zm0 2c-3.3 0-6 2.7-6 6v1h12v-1c0-3.3-2.7-6-6-6z" />
-  </svg>
-);
-
-const IconInstagram = (
-  <svg className="w-5 h-5 text-pink-400" fill="currentColor" viewBox="0 0 24 24">
-    <path d="M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5z" />
-  </svg>
-);
-
-const IconTwitter = (
-  <svg className="w-5 h-5 text-sky-400" fill="currentColor" viewBox="0 0 24 24">
-    <path d="M22 6c-.8.4-1.6.6-2.5.7a4.3 4.3 0 001.9-2.4 8.6 8.6 0 01-2.7 1A4.3 4.3 0 0016 4a4.3 4.3 0 00-4.3 4.3c0 .3 0 .6.1.9A12 12 0 013 5.1a4.3 4.3 0 001.3 5.7 4.2 4.2 0 01-2-.5 4.3 4.3 0 003.4 4.2 4.3 4.3 0 01-1.9.1 4.3 4.3 0 004 3 8.6 8.6 0 01-5.3 1.8A12.1 12.1 0 008.6 21c7.9 0 12.2-6.5 12.2-12.2v-.6A8.7 8.7 0 0022 6z" />
-  </svg>
-);
-
-const IconFacebook = (
-  <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-    <path d="M22 12a10 10 0 10-11.5 9.9v-7H8v-3h2.5V9.5A3.5 3.5 0 0114 6h3v3h-3a1 1 0 00-1 1V12h4l-.5 3h-3.5v7A10 10 0 0022 12z" />
-  </svg>
-);
