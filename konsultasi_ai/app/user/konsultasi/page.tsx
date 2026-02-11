@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, Send, Mic, BrainCircuit, User, Bot, 
   CheckCircle, Stethoscope, Loader2, AlertCircle, 
-  Activity
+  Activity, Tag, Sparkles, Heart, Moon, Droplets
 } from "lucide-react";
 
 // --- TYPING & INTERFACES ---
@@ -18,8 +18,15 @@ type Message = {
   timestamp: Date;
   type?: "text" | "diagnosis" | "error";
   diagnosisData?: DiagnosisResult;
-  symptoms?: string; // TAMBAHAN: Simpan gejala asli disini
+  symptoms?: string; 
+  metrics?: HealthMetrics;
 };
+
+interface HealthMetrics {
+  heartRate?: string;
+  sleepDuration?: string;
+  bloodSugar?: string;
+}
 
 interface DiagnosisResult {
   condition: string;
@@ -27,7 +34,18 @@ interface DiagnosisResult {
   description: string;
   advice: string[];
   recommendation: string;
+  riskFactors?: string[]; 
+  medications?: { name: string; dosage: string }[];
 }
+
+const COMMON_DISEASES = [
+  "Demam Tinggi", "Flu & Batuk", "Sakit Kepala (Migrain)", 
+  "Maag / Asam Lambung", "Nyeri Sendi", "Diabetes (Kencing Manis)", 
+  "Hipertensi (Tekanan Darah Tinggi)", "Gatal & Ruam Kulit", 
+  "Sesak Napas", "Insomnia (Susah Tidur)", "Diare", "Lemas & Lesu",
+  "Alergi Makanan/Debu", "Sakit Tenggorokan", "Pusing Berputar (Vertigo)",
+  "Nyeri Punggung Bawah", "Sariawan", "Batuk Kering", "Kram Perut", "Flu Mata"
+];
 
 export default function KonsultasiAIPage() {
   const router = useRouter();
@@ -35,7 +53,7 @@ export default function KonsultasiAIPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Halo! Saya asisten diagnosa AI berbasis GPT-4. Silakan ceritakan keluhan kesehatan Anda, dan saya akan menganalisanya.",
+      text: "Halo! Saya asisten diagnosa AI. Silakan jelaskan keluhan Anda. Lengkapi data vital (Detak Jantung, Kadar Gula, dan Durasi Tidur) untuk akurasi lebih baik.",
       sender: "ai",
       timestamp: new Date(),
       type: "text"
@@ -44,53 +62,75 @@ export default function KonsultasiAIPage() {
   
   const [input, setInput] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSubmittingToDoctor, setIsSubmittingToDoctor] = useState(false);
+  
+  const [heartRate, setHeartRate] = useState("");
+  const [sleepDuration, setSleepDuration] = useState("");
+  const [bloodSugar, setBloodSugar] = useState("");
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isAnalyzing]);
+  }, [messages, isAnalyzing, isSubmittingToDoctor]);
 
-  // --- FUNGSI KIRIM PESAN & ANALISA ---
+  const handleQuickSelect = (disease: string) => {
+    setInput(prev => prev ? `${prev}, ${disease}` : disease);
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isAnalyzing) return;
 
-    const userSymptoms = input; // Simpan gejala user
+    const userSymptoms = input; 
+    const metrics: HealthMetrics = {
+      heartRate: heartRate || undefined,
+      sleepDuration: sleepDuration || undefined, 
+      bloodSugar: bloodSugar || undefined,
+    };
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text: userSymptoms,
       sender: "user",
       timestamp: new Date(),
-      type: "text"
+      type: "text",
+      metrics 
     };
+    
     setMessages((prev) => [...prev, userMessage]);
     setInput(""); 
+    setHeartRate("");
+    setSleepDuration("");
+    setBloodSugar("");
     setIsAnalyzing(true);
 
     try {
       const response = await fetch('/api/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symptoms: userSymptoms }),
+        body: JSON.stringify({ 
+          symptoms: userSymptoms,
+          metrics: metrics 
+        }),
       });
 
       if (!response.ok) throw new Error("Gagal menghubungi server diagnosis.");
 
       const data: DiagnosisResult = await response.json();
 
-      // PERUBAHAN: Simpan gejala asli (userSymptoms) ke dalam pesan AI
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Berdasarkan analisa gejala Anda:",
+        text: "Berdasarkan analisa gejala dan data vital Anda:",
         sender: "ai",
         timestamp: new Date(),
         type: "diagnosis",
         diagnosisData: data,
-        symptoms: userSymptoms // <--- INI PENTING
+        symptoms: userSymptoms,
+        metrics: metrics
       };
       
       setMessages((prev) => [...prev, aiMessage]);
@@ -116,9 +156,9 @@ export default function KonsultasiAIPage() {
     }
   };
 
-  // --- FUNGSI KONSULTASI DOKTER (TERHUBUNG DATABASE) ---
-  const handleConsultDoctor = async (diagnosisData: DiagnosisResult, originalSymptoms: string) => {
-    // 1. Ambil Data User dari LocalStorage
+  const handleConsultDoctor = async (diagnosisData: DiagnosisResult, originalSymptoms: string, metrics?: HealthMetrics) => {
+    setIsSubmittingToDoctor(true);
+
     const userStr = localStorage.getItem("user");
     let userId = 0;
     let userName = "Guest";
@@ -128,119 +168,163 @@ export default function KonsultasiAIPage() {
         const user = JSON.parse(userStr);
         userId = user.id || 0;
         userName = user.name || "User";
-      } catch (e) {
-        console.error("Gagal parsing user", e);
-      }
+      } catch (e) { console.error("Gagal parsing user", e); }
     }
 
-    // 2. Kirim Data ke API Create
     try {
       const res = await fetch('/api/consultation/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          userName,
-          symptoms: originalSymptoms,
-          diagnosisData
+        body: JSON.stringify({ 
+          userId, 
+          userName, 
+          symptoms: originalSymptoms, 
+          diagnosisData,
+          metrics 
         }),
       });
 
-      const result = await res.json();
-      
-      if (res.ok) {
-        // 3. Jika sukses, redirect ke halaman chat dokter (atau beri notifikasi)
-        alert("Konsultasi berhasil dikirim ke antrian dokter!");
-        // Opsional: Redirect ke halaman chat dokter jika Anda memilikinya
-        // router.push("/chat-dokter"); 
-      } else {
-        alert("Gagal mengirim konsultasi: " + result.error);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Server Error Response:", errorText);
+        throw new Error(`Server Error ${res.status}: ${errorText}`);
       }
-    } catch (error) {
-      console.error(error);
-      alert("Terjadi kesalahan jaringan.");
+
+      let result;
+      try {
+        result = await res.json();
+      } catch (e) {
+        const text = await res.text();
+        console.error("JSON Parse Error. Server returned:", text);
+        throw new Error(`Respon server tidak valid (bukan JSON). Isi: ${text.substring(0, 100)}...`);
+      }
+
+      if (result.success) {
+        if (result.consultationId) {
+          localStorage.setItem("latestConsultationId", String(result.consultationId));
+        }
+        router.push("/user/chat-dokter");
+      } else {
+        alert("Gagal mengirim ke dokter: " + (result.error || "Terjadi kesalahan"));
+      }
+    } catch (error: any) {
+      console.error("Error handleConsultDoctor:", error);
+      alert("Terjadi kesalahan: " + error.message);
+    } finally {
+      setIsSubmittingToDoctor(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans flex flex-col">
+    <div className="h-screen flex flex-col bg-[#0B1121] text-slate-100 font-sans overflow-hidden relative">
+      
+      {/* BACKGROUND DECORATION */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-cyan-500/10 rounded-full blur-[100px]"></div>
+        <div className="absolute bottom-0 left-0 w-[400px] h-[300px] bg-purple-500/10 rounded-full blur-[80px]"></div>
+      </div>
+      
       {/* HEADER */}
-      <header className="border-b border-white/10 bg-slate-900/90 backdrop-blur-xl p-4 sticky top-0 z-50">
+      <header className="relative z-20 border-b border-white/5 bg-[#0B1121]/80 backdrop-blur-xl p-4 shrink-0">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-              <ArrowLeft className="w-5 h-5 text-slate-400" />
+            <button onClick={() => router.back()} className="p-2.5 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-white border border-transparent hover:border-white/10">
+              <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <BrainCircuit className="w-5 h-5 text-white" />
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <BrainCircuit className="w-5 h-5 text-white" />
+                </div>
+                <span className="absolute -bottom-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
               </div>
               <div>
-                <h1 className="font-bold text-lg leading-tight">AI Diagnosa Medis</h1>
+                <h1 className="font-bold text-base leading-tight tracking-tight text-white">AI Diagnosa Medis</h1>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                  <span className="text-xs text-emerald-400 font-medium">Online</span>
+                  <span className="text-[10px] text-emerald-400 font-medium">Online • Ready</span>
                 </div>
               </div>
             </div>
           </div>
-          <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
-            <Activity className="w-3 h-3 text-emerald-400" />
-            <span className="text-[10px] font-bold text-emerald-400">GPT-4 Active</span>
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 border border-white/5">
+            <Sparkles className="w-3 h-3 text-cyan-400" />
+            <span className="text-[10px] font-medium text-slate-300">DB Sync: Active</span>
           </div>
         </div>
       </header>
 
       {/* CHAT AREA */}
-      <main className="flex-1 overflow-y-auto p-4 max-w-4xl mx-auto w-full space-y-6 bg-slate-950">
+      <main className="relative z-10 flex-1 overflow-y-auto p-4 md:p-6 max-w-4xl mx-auto w-full space-y-8 scroll-smooth">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`flex max-w-[85%] gap-3 ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
+            <div className={`flex max-w-[90%] md:max-w-[85%] gap-3 ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
               
               {/* AVATAR */}
-              <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border border-white/10 ${
-                msg.sender === "user" ? "bg-gradient-to-br from-purple-500 to-indigo-600" : "bg-slate-800"
+              <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center border border-white/5 shadow-sm mt-1 ${
+                msg.sender === "user" 
+                  ? "bg-gradient-to-br from-indigo-500 to-purple-600" 
+                  : "bg-slate-800"
               }`}>
                 {msg.sender === "user" ? <User className="w-4 h-4 text-white" /> : <BrainCircuit className="w-4 h-4 text-cyan-400" />}
               </div>
 
               {/* TEXT BUBBLE */}
               {msg.type === "text" && (
-                <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-md ${
-                  msg.sender === "user" ? "bg-cyan-600 text-white rounded-tr-none" : "bg-slate-800/80 backdrop-blur text-slate-200 rounded-tl-none border border-white/5"
-                }`}>
-                  {msg.text}
+                <div className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
+                   {msg.sender === "user" && msg.metrics && (
+                     <div className="mb-1 flex flex-wrap gap-2 justify-end opacity-70 scale-90 origin-bottom-right">
+                        {msg.metrics.heartRate && <span className="px-2 py-0.5 rounded bg-slate-700 text-[10px] text-rose-300 flex items-center gap-1"><Heart className="w-3 h-3"/> {msg.metrics.heartRate} bpm</span>}
+                        {msg.metrics.bloodSugar && <span className="px-2 py-0.5 rounded bg-slate-700 text-[10px] text-blue-300 flex items-center gap-1"><Droplets className="w-3 h-3"/> {msg.metrics.bloodSugar} mg/dL</span>}
+                        {msg.metrics.sleepDuration && <span className="px-2 py-0.5 rounded bg-slate-700 text-[10px] text-indigo-300 flex items-center gap-1"><Moon className="w-3 h-3"/> {msg.metrics.sleepDuration} Jam</span>}
+                     </div>
+                   )}
+                  <div className={`px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-md ${
+                    msg.sender === "user" 
+                      ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white rounded-tr-sm" 
+                      : "bg-slate-800/60 backdrop-blur-sm text-slate-200 rounded-tl-sm border border-white/5"
+                  }`}>
+                    {msg.text}
+                    {/* TAMPILKAN WAKTU DENGAN suppressHydrationWarning AGAR ERROR HILANG */}
+                    <div suppressHydrationWarning className={`text-[9px] mt-1 opacity-60 ${msg.sender === "user" ? "text-right text-cyan-50" : "text-left text-slate-500"}`}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    </div>
+                  </div>
                 </div>
               )}
 
               {/* ERROR BUBBLE */}
               {msg.type === "error" && (
-                <div className="p-4 rounded-2xl bg-rose-900/30 border border-rose-500/30 text-rose-200 text-sm flex items-center gap-2 shadow-sm">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{msg.text}</span>
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-200 text-sm flex items-start gap-3 shadow-sm backdrop-blur-sm">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold block mb-1">Terjadi Kesalahan</span>
+                    <span>{msg.text}</span>
+                  </div>
                 </div>
               )}
 
               {/* DIAGNOSIS CARD */}
               {msg.type === "diagnosis" && msg.diagnosisData && (
-                <div className="w-full bg-slate-900/90 border border-cyan-500/30 rounded-2xl overflow-hidden shadow-2xl shadow-cyan-900/20 backdrop-blur-md animate-fade-in">
-                  
-                  {/* HEADER */}
-                  <div className="bg-gradient-to-r from-cyan-900/50 to-slate-900 p-4 border-b border-white/5 flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle className="w-4 h-4 text-cyan-400" />
-                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Hasil Analisa AI</span>
+                <div className="w-full bg-slate-800/40 backdrop-blur-md border border-white/5 rounded-3xl overflow-hidden shadow-2xl shadow-black/20 animate-fade-in">
+                  <div className="bg-gradient-to-r from-cyan-900/30 to-slate-900/30 p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Hasil Analisa AI</span>
                       </div>
-                      <h3 className="text-xl font-bold text-white">{msg.diagnosisData.condition}</h3>
+                      <h3 className="text-xl font-bold text-white leading-tight">{msg.diagnosisData.condition}</h3>
                     </div>
-                    {/* BADGE */}
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1 ${
-                      msg.diagnosisData.severity === "Tinggi" ? "bg-rose-500/20 text-rose-400 border-rose-500/30" :
-                      msg.diagnosisData.severity === "Sedang" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
-                      "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    <div className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold border flex items-center gap-2 shadow-sm ${
+                      msg.diagnosisData.severity === "Tinggi" ? "bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-rose-500/10" :
+                      msg.diagnosisData.severity === "Sedang" ? "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/10" :
+                      "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-emerald-500/10"
                     }`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${
+                      <div className={`w-2 h-2 rounded-full ${
                         msg.diagnosisData.severity === "Tinggi" ? "bg-rose-400" :
                         msg.diagnosisData.severity === "Sedang" ? "bg-amber-400" :
                         "bg-emerald-400"
@@ -249,41 +333,75 @@ export default function KonsultasiAIPage() {
                     </div>
                   </div>
 
-                  {/* BODY */}
-                  <div className="p-5 space-y-4">
+                  <div className="p-6 space-y-5">
                     <p className="text-sm text-slate-300 leading-relaxed">{msg.diagnosisData.description}</p>
-
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-2">
-                        <Stethoscope className="w-3 h-3" /> Saran Tindakan:
+                    {msg.diagnosisData.riskFactors && msg.diagnosisData.riskFactors.length > 0 && (
+                      <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl p-4">
+                         <h4 className="text-xs font-bold text-rose-300 uppercase mb-2 flex items-center gap-2">
+                           <Activity className="w-3.5 h-3.5" /> Faktor Risiko Terdeteksi
+                         </h4>
+                         <ul className="list-disc list-inside text-xs text-rose-100/80 space-y-1">
+                            {msg.diagnosisData.riskFactors.map((risk, i) => (
+                              <li key={i}>{risk}</li>
+                            ))}
+                         </ul>
+                      </div>
+                    )}
+                    <div className="bg-slate-900/40 rounded-xl p-4 border border-white/5">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
+                        <Stethoscope className="w-3.5 h-3.5 text-cyan-500" /> Saran Tindakan:
                       </h4>
-                      <ul className="space-y-2">
+                      <ul className="space-y-2.5">
                         {msg.diagnosisData.advice.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-slate-300">
-                            <span className="text-cyan-500 mt-1.5">✓</span>
+                          <li key={idx} className="flex items-start gap-3 text-sm text-slate-300">
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs mt-0.5 border border-cyan-500/20">
+                              {idx + 1}
+                            </span>
                             <span>{item}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-
-                    <div className="bg-cyan-950/30 p-3 rounded-lg border border-cyan-500/10">
-                      <p className="text-xs text-cyan-200/80 italic flex gap-2">
-                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                    {msg.diagnosisData.medications && msg.diagnosisData.medications.length > 0 && (
+                      <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4">
+                        <h4 className="text-xs font-bold text-blue-300 uppercase mb-3 flex items-center gap-2">
+                          <Activity className="w-3.5 h-3.5" /> Obat Pendukung (Umum)
+                        </h4>
+                        <div className="space-y-2">
+                          {msg.diagnosisData.medications.map((med, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-sm border-b border-white/5 pb-2 last:border-0">
+                              <span className="font-medium text-blue-100">{med.name}</span>
+                              <span className="text-xs text-blue-300/70 bg-blue-900/20 px-2 py-1 rounded">{med.dosage}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-xl flex gap-3">
+                      <AlertCircle className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-indigo-200/90 leading-relaxed italic">
                         {msg.diagnosisData.recommendation}
                       </p>
                     </div>
                   </div>
 
-                  {/* FOOTER ACTION */}
-                  <div className="p-4 bg-slate-800/50 border-t border-white/10">
-                    {/* PERUBAHAN: Memanggil fungsi handleConsultDoctor dengan data */}
+                  <div className="p-5 bg-slate-800/50 border-t border-white/5">
                     <button 
-                      onClick={() => handleConsultDoctor(msg.diagnosisData!, msg.symptoms!)}
-                      className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 group active:scale-95"
+                      onClick={() => handleConsultDoctor(msg.diagnosisData!, msg.symptoms!, msg.metrics)}
+                      disabled={isSubmittingToDoctor}
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-700 text-white font-bold text-sm transition-all shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 active:scale-[0.98] flex items-center justify-center gap-2"
                     >
-                      <Stethoscope className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                      Konsultasi Lanjut ke Dokter
+                      {isSubmittingToDoctor ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Mengirim ke Dokter...
+                        </>
+                      ) : (
+                        <>
+                          <Stethoscope className="w-4 h-4" />
+                          Konsultasi Lanjut ke Dokter
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -292,60 +410,155 @@ export default function KonsultasiAIPage() {
           </div>
         ))}
 
-        {/* LOADING */}
         {isAnalyzing && (
-          <div className="flex justify-center my-4">
-            <div className="bg-slate-900/90 border border-cyan-500/20 px-6 py-4 rounded-2xl flex items-center gap-3 shadow-xl backdrop-blur-md">
+          <div className="flex justify-center my-2">
+            <div className="bg-slate-800/80 backdrop-blur-md border border-white/10 px-6 py-4 rounded-2xl flex items-center gap-3 shadow-xl">
               <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
-              <span className="text-sm text-cyan-400 font-medium">Menganalisis gejala dengan AI...</span>
+              <span className="text-sm text-slate-300 font-medium">Menganalisis gejala & data vital...</span>
             </div>
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-4" />
       </main>
 
       {/* INPUT AREA */}
-      <footer className="p-4 bg-slate-900/90 backdrop-blur-xl border-t border-white/10 sticky bottom-0 z-50">
-        <div className="max-w-4xl mx-auto relative">
-          <div className="flex items-end gap-2 bg-slate-950 border border-white/10 rounded-2xl p-2 focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/20 transition-all shadow-2xl">
-            <button className="p-2 text-slate-400 hover:text-cyan-400 transition-colors rounded-xl hover:bg-white/5">
+      <footer className="relative z-20 shrink-0 bg-[#0B1121]/95 backdrop-blur-xl border-t border-white/5">
+        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-4">
+          
+          {/* --- FORMULIR KESEHATAN TAMBAHAN (OPSIONAL) --- */}
+          <div className="bg-slate-800/30 rounded-2xl p-4 border border-white/5 animate-fade-in-up">
+            <div className="flex items-center gap-2 text-[11px] text-cyan-400 mb-3 font-bold uppercase tracking-wider">
+              <Activity className="w-3 h-3" />
+              <span>Data Vital (Disimpan ke Database)</span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Heart className="h-4 w-4 text-rose-400 group-focus-within:text-rose-300" />
+                </div>
+                <input
+                  type="number"
+                  value={heartRate}
+                  onChange={(e) => setHeartRate(e.target.value)}
+                  placeholder="Detak Jantung (bpm)"
+                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 transition-all"
+                />
+              </div>
+
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Droplets className="h-4 w-4 text-blue-400 group-focus-within:text-blue-300" />
+                </div>
+                <input
+                  type="number"
+                  value={bloodSugar}
+                  onChange={(e) => setBloodSugar(e.target.value)}
+                  placeholder="Kadar Gula (mg/dL)"
+                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                />
+              </div>
+
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Moon className="h-4 w-4 text-indigo-400 group-focus-within:text-indigo-300" />
+                </div>
+                <input
+                  type="number"
+                  value={sleepDuration}
+                  onChange={(e) => setSleepDuration(e.target.value)}
+                  placeholder="Durasi Tidur (Jam)"
+                  min="0"
+                  max="24"
+                  step="0.5"
+                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-xs text-slate-500 font-medium">Jam</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* --- QUICK SELECT DISEASE --- */}
+          <div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-2.5 font-medium uppercase tracking-wide">
+              <Tag className="w-3 h-3" />
+              <span>Pilih Gejala / Penyakit Umum</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {COMMON_DISEASES.map((disease, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleQuickSelect(disease)}
+                  className="whitespace-nowrap px-4 py-2 rounded-full bg-slate-800/50 border border-white/10 text-xs text-slate-300 hover:bg-cyan-900/20 hover:border-cyan-500/30 hover:text-cyan-300 transition-all active:scale-95"
+                >
+                  {disease}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* --- INPUT UTAMA --- */}
+          <div className="flex items-end gap-2 bg-slate-800/30 border border-white/10 rounded-3xl p-2 pl-4 focus-within:bg-slate-800/50 focus-within:border-cyan-500/40 focus-within:ring-1 focus-within:ring-cyan-500/10 transition-all shadow-inner">
+            <button className="p-2.5 text-slate-400 hover:text-cyan-400 transition-colors rounded-full hover:bg-white/5">
               <Mic className="w-5 h-5" />
             </button>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Contoh: Saya pusing kepala bagian belakang disertai mual..."
-              className="flex-1 bg-transparent border-none outline-none text-white placeholder-slate-500 resize-none py-2 max-h-32 text-sm"
+              placeholder="Jelaskan keluhan kesehatan Anda secara detail..."
+              className="flex-1 bg-transparent border-none outline-none text-slate-100 placeholder-slate-500 resize-none py-3 text-sm leading-relaxed"
               rows={1}
               disabled={isAnalyzing}
-              style={{ minHeight: '40px' }}
+              style={{ minHeight: '48px' }}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isAnalyzing}
-              className="p-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20"
+              className="p-3 bg-gradient-to-br from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20 flex items-center justify-center"
             >
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-[10px] text-slate-500 text-center mt-2 flex justify-center gap-1">
-            <span>Powered by</span>
-            <span className="font-semibold text-slate-400">OpenAI GPT-4o Mini</span>
-            <span>•</span>
-            <span>Hasil analisa bersifat informatif, bukan diagnosa medis resmi.</span>
-          </p>
         </div>
       </footer>
 
       <style jsx global>{`
         .animate-fade-in {
-          animation: fadeIn 0.5s ease-out forwards;
+          animation: fadeIn 0.6s ease-out forwards;
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.5s ease-out forwards;
         }
         @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(15px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        main::-webkit-scrollbar {
+            width: 6px;
+        }
+        main::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        main::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+        }
+        main::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.2);
         }
       `}</style>
     </div>
