@@ -1,50 +1,31 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import pool from '../../../lib/db'; 
 
-const dbConfig = {
-  host: 'localhost',
-  user: 'root',
-  password: '', 
-  database: 'kesehatan_ai',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-};
+// ... fungsi GET tetap sama ...
 
-async function query(sql: string, params?: any[]) {
-  const connection = await mysql.createConnection(dbConfig);
-  try {
-    const [rows] = await connection.execute(sql, params);
-    return rows;
-  } finally {
-    await connection.end();
-  }
-}
-
-export async function POST(req: Request) {
+// --- FUNGSI PUT (SIMPAN BALASAN) ---
+export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { userId, userName, symptoms, diagnosisData } = body;
+    const { id, doctor_reply } = body;
 
-    // Format data diagnosa menjadi string yang mudah dibaca dokter
-    const diagnosisText = `
-KONDISI: ${diagnosisData.condition}
-TINGKAT KEPARAHAN: ${diagnosisData.severity}
-DESKRIPSI: ${diagnosisData.description}
-SARAN: ${diagnosisData.advice.join(', ')}
-REKOMENDASI: ${diagnosisData.recommendation}
-    `.trim();
+    if (!id || !doctor_reply) {
+      return NextResponse.json({ error: 'ID dan Balasan wajib diisi' }, { status: 400 });
+    }
 
-    // Simpan ke Database
-    await query(
-      'INSERT INTO consultations (user_id, user_name, symptoms, ai_diagnosis, status) VALUES (?, ?, ?, ?, ?)',
-      [userId, userName, symptoms, diagnosisText, 'pending']
-    );
+    // Query Update Database
+    const query = `
+      UPDATE consultations 
+      SET doctor_reply = ?, status = 'replied' 
+      WHERE id = ?
+    `;
 
-    return NextResponse.json({ success: true, message: 'Konsultasi dikirim ke antrian dokter.' });
+    await pool.query(query, [doctor_reply, id]);
+
+    return NextResponse.json({ success: true, message: "Balasan disimpan" });
 
   } catch (error: any) {
-    console.error("Error saving consultation:", error);
+    console.error("Gagal simpan reply:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

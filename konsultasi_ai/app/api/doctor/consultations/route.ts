@@ -1,63 +1,66 @@
 import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
 
-// Koneksi Database (Sama seperti sebelumnya)
 const dbConfig = {
   host: 'localhost',
   user: 'root',
   password: '', 
-  database: 'kesehatan_ai',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  database: 'kesehatan_ai'
 };
 
-async function query(sql: string, params?: any[]) {
-  const connection = await mysql.createConnection(dbConfig);
+// --- 1. FUNGSI GET (Mengambil Data) ---
+export async function GET() {
   try {
-    const [rows] = await connection.execute(sql, params);
-    return rows;
-  } finally {
-    await connection.end();
-  }
-}
+    const connection = await mysql.createConnection(dbConfig);
 
-// GET: Ambil semua konsultasi
-export async function GET(req: Request) {
-  try {
-    // Urutkan dari yang terbaru, pending di atas
-    const consultations = await query(`
+    const query = `
       SELECT * FROM consultations 
-      ORDER BY 
-        CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
-        created_at DESC
-    `) as any[];
+      ORDER BY created_at DESC
+    `;
 
-    return NextResponse.json(consultations);
+    const [rows] = await connection.execute(query);
+    // console.log("📤 Data yang dikirim ke Dokter:", rows); 
+    
+    await connection.end();
+
+    return NextResponse.json(rows);
+
   } catch (error: any) {
-    console.error("Error fetching consultations:", error);
+    console.error("Gagal fetch data doctor:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// PUT: Balas Konsultasi
+// --- 2. FUNGSI PUT (Menyimpan Balasan Dokter) ---
 export async function PUT(req: Request) {
   try {
+    // Ambil data dari body request (ID konsultasi dan isi balasan)
     const body = await req.json();
-    const { id, reply } = body;
+    const { id, doctor_reply } = body;
 
-    if (!id || !reply) {
-      return NextResponse.json({ error: 'ID dan Balasan wajib diisi' }, { status: 400 });
+    // Validasi sederhana
+    if (!id || !doctor_reply) {
+      return NextResponse.json({ error: 'ID dan Balasan Dokter wajib diisi' }, { status: 400 });
     }
 
-    await query(
-      'UPDATE consultations SET doctor_reply = ?, status = ? WHERE id = ?',
-      [reply, 'replied', id]
-    );
+    const connection = await mysql.createConnection(dbConfig);
 
-    return NextResponse.json({ success: true, message: 'Balasan terkirim' });
+    // Query Update:
+    // 1. Mengisi kolom 'doctor_reply'
+    // 2. Mengubah status menjadi 'replied'
+    const query = `
+      UPDATE consultations 
+      SET doctor_reply = ?, status = 'replied' 
+      WHERE id = ?
+    `;
+
+    await connection.execute(query, [doctor_reply, id]);
+    await connection.end();
+
+    return NextResponse.json({ success: true, message: "Balasan dokter berhasil disimpan" });
+
   } catch (error: any) {
-    console.error("Error replying consultation:", error);
+    console.error("Gagal simpan balasan dokter:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
