@@ -1,7 +1,4 @@
-import { NextResponse } from 'next/server';
-
-// Ganti import ini sesuai library database yang Anda pakai (Contoh: Prisma, Mongoose, atau pg)
-// import { prisma } from '@/lib/prisma'; 
+import { NextResponse } from 'next/server'; 
 
 export async function POST(req: Request) {
   try {

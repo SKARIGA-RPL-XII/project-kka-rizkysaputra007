@@ -1,6 +1,6 @@
 // app/api/user/consultations/route.ts
 import { NextResponse } from 'next/server';
-import pool from '../../../lib/db';
+import pool from '../../../lib/db'; 
 
 export async function GET(req: Request) {
   try {
@@ -11,19 +11,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'User ID diperlukan' }, { status: 400 });
     }
 
-    // Query ini SUDAH mengambil doctor_reply
     const query = `
-      SELECT 
-        id, 
-        user_name, 
-        symptoms, 
-        ai_diagnosis, 
-        doctor_reply,  <-- PASTIKAN BARIS INI ADA
-        status, 
-        created_at,
-        heart_rate,
-        blood_sugar,
-        sleep_duration
+      SELECT id, user_name, symptoms, ai_diagnosis, doctor_reply, status, created_at
       FROM consultations 
       WHERE user_id = ? 
       ORDER BY created_at DESC
@@ -33,7 +22,7 @@ export async function GET(req: Request) {
     return NextResponse.json(rows);
 
   } catch (error: any) {
-    console.error("Gagal mengambil consultations:", error);
+    console.error("Error fetch consultations:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

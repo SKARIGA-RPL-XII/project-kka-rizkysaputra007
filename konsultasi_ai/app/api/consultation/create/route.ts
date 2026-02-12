@@ -1,31 +1,54 @@
 import { NextResponse } from 'next/server';
-import pool from '../../../lib/db'; 
+import pool from '../../../lib/db'; // Gunakan path relatif ini jika @/lib/db error
 
-// ... fungsi GET tetap sama ...
-
-// --- FUNGSI PUT (SIMPAN BALASAN) ---
-export async function PUT(req: Request) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { id, doctor_reply } = body;
+    
+    console.log("📨 Data Masuk ke API Create:", body);
 
-    if (!id || !doctor_reply) {
-      return NextResponse.json({ error: 'ID dan Balasan wajib diisi' }, { status: 400 });
+    const { userId, userName, symptoms, diagnosisData, metrics } = body;
+
+    if (!userName || !symptoms) {
+      return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
     }
 
-    // Query Update Database
+    const heartRate = metrics?.heartRate || null;
+    const bloodSugar = metrics?.bloodSugar || null;
+    const sleepDuration = metrics?.sleepDuration || null;
+
+    const diagnosisJson = JSON.stringify(diagnosisData || {});
+
     const query = `
-      UPDATE consultations 
-      SET doctor_reply = ?, status = 'replied' 
-      WHERE id = ?
+      INSERT INTO consultations 
+      (user_id, user_name, symptoms, ai_diagnosis, heart_rate, blood_sugar, sleep_duration, created_at, status) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), 'pending')
     `;
 
-    await pool.query(query, [doctor_reply, id]);
+    const values = [
+      userId || null, 
+      userName, 
+      symptoms, 
+      diagnosisJson, 
+      heartRate, 
+      bloodSugar, 
+      sleepDuration
+    ];
 
-    return NextResponse.json({ success: true, message: "Balasan disimpan" });
+    const [result] = await pool.query(query, values);
+
+    console.log("✅ Sukses Insert ke DB, ID:", (result as any).insertId);
+
+    return NextResponse.json({ 
+      success: true, 
+      consultationId: (result as any).insertId 
+    });
 
   } catch (error: any) {
-    console.error("Gagal simpan reply:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("🔴 Error API Create:", error);
+    return NextResponse.json({ 
+      error: 'Gagal menyimpan ke database', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
