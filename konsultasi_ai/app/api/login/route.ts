@@ -27,15 +27,6 @@ export async function POST(req: Request) {
 
     const user = rows[0];
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return NextResponse.json(
-        { success: false, message: "Password salah" },
-        { status: 401 }
-      );
-    }
-
-    // ✅ RESPONSE
     const res = NextResponse.json({
       success: true,
       user: {

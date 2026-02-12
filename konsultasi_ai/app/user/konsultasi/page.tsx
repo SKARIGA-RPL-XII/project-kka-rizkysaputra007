@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, Send, Mic, BrainCircuit, User, Bot, 
   CheckCircle, Stethoscope, Loader2, AlertCircle, 
-  Activity, Tag, Sparkles, Heart, Moon, Droplets
+  Activity, Tag, Sparkles, Heart, Moon, Droplets,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 
 // --- TYPING & INTERFACES ---
@@ -20,6 +21,7 @@ type Message = {
   diagnosisData?: DiagnosisResult;
   symptoms?: string; 
   metrics?: HealthMetrics;
+  isManual?: boolean; // Flag baru untuk membedakan manual bot
 };
 
 interface HealthMetrics {
@@ -53,7 +55,7 @@ export default function KonsultasiAIPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Halo! Saya asisten diagnosa AI. Silakan jelaskan keluhan Anda. Lengkapi data vital (Detak Jantung, Kadar Gula, dan Durasi Tidur) untuk akurasi lebih baik.",
+      text: "Halo! Saya asisten diagnosa AI. Silakan jelaskan keluhan Anda.",
       sender: "ai",
       timestamp: new Date(),
       type: "text"
@@ -64,9 +66,11 @@ export default function KonsultasiAIPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSubmittingToDoctor, setIsSubmittingToDoctor] = useState(false);
   
+  // State Form Vital
   const [heartRate, setHeartRate] = useState("");
   const [sleepDuration, setSleepDuration] = useState("");
   const [bloodSugar, setBloodSugar] = useState("");
+  const [isVitalsExpanded, setIsVitalsExpanded] = useState(false); // State baru untuk collapsible
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +84,166 @@ export default function KonsultasiAIPage() {
 
   const handleQuickSelect = (disease: string) => {
     setInput(prev => prev ? `${prev}, ${disease}` : disease);
+  };
+
+  // --- FUNGSI BOT MANUAL (FALLBACK) ---
+    // --- FUNGSI BOT MANUAL (FALLBACK) - VERSI DIPERLUAS ---
+  const getManualDiagnosis = (symptoms: string, metrics?: HealthMetrics): DiagnosisResult => {
+    const lowerSym = symptoms.toLowerCase();
+    
+    // Struktur Default
+    let condition = "Keluhan Umum";
+    let severity: "Rendah" | "Sedang" | "Tinggi" = "Rendah";
+    let advice: string[] = ["Istirahat yang cukup.", "Perbanyak minum air putih.", "Konsumsi makanan bergizi."];
+    let medications: { name: string; dosage: string }[] = [];
+    let riskFactors: string[] = [];
+
+    // --- PRIORITAS 1: KONDISI KRITIS (SEVERITY TINGGI) ---
+    if (lowerSym.includes("sesak") || lowerSym.includes("napas berat") || lowerSym.includes("dada sesak")) {
+      condition = "Gangguan Pernapasan Akut";
+      severity = "Tinggi";
+      advice = [
+        "Segera berhenti aktivitas fisik.",
+        "Posisikan tubuh duduk tegak dan bersandar.",
+        "Buka jendela untuk sirkulasi udara.",
+        "JANGAN MENUNGGU, segera ke IGD jika sesak tidak reda dalam 5 menit."
+      ];
+      medications = [{ name: "Oksigen Tambahan", dosage: "Jika tersedia" }];
+      riskFactors = ["Riwayat Asma", "Penyakit Paru-Paru", "Penyakit Jantung", "Obesitas"];
+    }
+    // PRIORITAS 2: JANTUNG DARAH TINGGI (Metrik)
+    else if (metrics?.heartRate && parseInt(metrics.heartRate) > 120) {
+      condition = "Takikardia (Detak Jantung Cepat)";
+      severity = "Tinggi";
+      advice = [
+        "Duduk atau berbaring dengan tenang.",
+        "Tarik napas dalam secara perlahan.",
+        "Hindari konsumsi kafein dan nikotin.",
+        "Periksa ke dokter spesialis jantung segera."
+      ];
+      medications = [{ name: "Beta-Blocker", dosage: "Sesuai resep dokter" }];
+      riskFactors = ["Stres berlebihan", "Anemia", "Masalah Tiroid", "Gaya hidup tidak sehat"];
+    }
+    // PRIORITAS 3: DIABETES / GULA DARAH (Metrik)
+    else if (metrics?.bloodSugar && parseInt(metrics.bloodSugar) > 200) {
+      condition = "Hiperglikemia (Gula Darah Sangat Tinggi)";
+      severity = "Tinggi";
+      advice = [
+        "Minum air putih banyak-banyak.",
+        "Hindari makanan manis dan karbohidrat sederhana.",
+        "Lakukan aktivitas ringan berjalan kaki 15 menit.",
+        "Cek kembali gula darah dalam 1-2 jam."
+      ];
+      medications = [{ name: "Insulin", dosage: "Sesuai resep dokter" }, { name: "Metformin", dosage: "Sesuai resep dokter" }];
+      riskFactors = ["Riwayat Diabetes", "Obesitas", "Polimakanan", "Kurang aktivitas fisik"];
+    }
+    // --- PRIORITAS 4: NEUROLOGI (Saraf & Otak) ---
+    else if (lowerSym.includes("pusing") || lowerSym.includes("sakit kepala") || lowerSym.includes("migrain") || lowerSym.includes("vertigo")) {
+      condition = lowerSym.includes("vertigo") ? "Vertigo (Pusing Berputar)" : "Sakit Kepala (Migrain / Tegang)";
+      severity = "Sedang";
+      advice = [
+        "Cari ruangan yang tenang dan minim cahaya.",
+        "Kompres bagian kepala dengan air es atau hangat.",
+        "Hindari gadget (HP/Laptop) selama 1 jam.",
+        "Minum obat pereda nyeri jika perlu."
+      ];
+      medications = [{ name: "Paracetamol", dosage: "500mg per 6 jam" }, { name: "Sumatriptan", dosage: "Hanya jika migrain parah" }];
+      riskFactors = ["Stres / Tegang", "Dehidrasi", "Kurang Tidur", "Masalah Tulang Leher"];
+    }
+    // --- PRIORITAS 5: PENCERNAAN ---
+    else if (lowerSym.includes("maag") || lowerSym.includes("asam lambung") || lowerSym.includes("perut mual") || lowerSym.includes("mulas") || lowerSym.includes("berak") || lowerSym.includes("diare")) {
+      condition = "Gangguan Pencernaan (Maag / Infeksi Usus)";
+      severity = "Sedang";
+      advice = [
+        "Hindari makanan pedas, asam, dan berminyak.",
+        "Makan dalam porsi kecil tapi sering.",
+        "Konsumsi makanan yang mudah dicerna (bubur, pisang).",
+        "Perbanyak minum oralit untuk mengganti cairan tubuh."
+      ];
+      medications = [{ name: "Antasida (Promag)", dosage: "1x sebelum makan" }, { name: "Zincat", dosage: "Sesuai dosis" }];
+      riskFactors = ["Polamakanan tidak teratur", "Stres", "Infeksi Bakteri", "Alergi Makanan"];
+    }
+    // --- PRIORITAS 6: PERNAFASAN (Tidak Kritis) ---
+    else if (lowerSym.includes("batuk") || lowerSym.includes("flu") || lowerSym.includes("pilek") || lowerSym.includes("tenggorokan")) {
+      condition = "Infeksi Saluran Pernapasan (Flu / Batuk)";
+      severity = "Sedang";
+      advice = [
+        "Gunakan masker saat berada di dekat orang lain.",
+        "Kompres dada dengan air hangat.",
+        "Rajin mencuci tangan dengan sabun.",
+        "Konsumsi makanan kaya vitamin C (Jeruk, Sayuran)."
+      ];
+      medications = [{ name: "Obat Batuk Pilek", dosage: "3x sehari" }, { name: "Paracetamol", dosage: "Jika demam" }];
+      riskFactors = ["Kekebalan tubuh lemah", "Pergantian musim", "Paparan asap rokok"];
+    }
+    // --- PRIORITAS 7: MUSKULOSKELETAL ---
+    else if (lowerSym.includes("nyeri sendi") || lowerSym.includes("kaki sakit") || lowerSym.includes("pegal") || lowerSym.includes("tulang")) {
+      condition = "Nyeri Otot & Sendi (Rematik / Cedera Ringan)";
+      severity = "Rendah";
+      advice = [
+        "Istirahatkan bagian yang sakit.",
+        "Kompres dingin pada area nyeri selama 15-20 menit.",
+        "Hindari aktivitas berat sementara.",
+        "Lakukan peregangan ringan setelah nyeri berkurang."
+      ];
+      medications = [{ name: "Ibuprofen", dosage: "400mg setelah makan" }, { name: "Krim Antiradang", dosage: "Oles 2x sehari" }];
+      riskFactors = ["Aktivitas berat berlebihan", "Postur tubuh salah", "Penuaan"];
+    }
+    // --- PRIORITAS 8: KULIT ---
+    else if (lowerSym.includes("gatal") || lowerSym.includes("kulit merah") || lowerSym.includes("panu") || lowerSym.includes("ruam")) {
+      condition = "Iritasi / Alergi Kulit";
+      severity = "Rendah";
+      advice = [
+        "Jangan digaruk agar tidak infeksi.",
+        "Gunakan bedak dingin atau salep anti-gatal.",
+        "Hindari sabun mandi yang keras.",
+        "Kenakan pakaian berbahan katun longgar."
+      ];
+      medications = [{ name: "Salep Anti-Gatal (Calamine)", dosage: "Oles 3x sehari" }, { name: "Antihistamin", dosage: "Sesuai dosis" }];
+      riskFactors = ["Alergi Makanan/Debu/Debu", "Gigitan Serangga", "Kulit Kering"];
+    }
+    // --- PRIORITAS 9: METABOLIK / UMUM ---
+    else if (lowerSym.includes("lemas") || lowerSym.includes("letih") || lowerSym.includes("lapar berlebih") || lowerSym.includes("berat badan turun")) {
+      condition = "Kelelahan & Gangguan Metabolik";
+      severity = "Sedang";
+      advice = [
+        "Cek tekanan darah dan gula darah.",
+        "Tidur minimal 7-8 jam per malam.",
+        "Konsumsi makanan bernutrisi tinggi (Telur, Daging, Sayur Hijau).",
+        "Istirahat total 1-2 hari."
+      ];
+      medications = [{ name: "Multivitamin", dosage: "1x sehari" }];
+      riskFactors = ["Anemia", "Hipertiroid", "Depresi", "Diabetes tidak terdiagnosis"];
+    }
+
+    // --- PEMERIKSAAN TAMBAHAN DARI METRICS (BERDASARKAN KONDISI UTAMA) ---
+    if (metrics?.heartRate && parseInt(metrics.heartRate) > 100 && condition !== "Takikardia") {
+      if (severity !== "Tinggi") severity = "Sedang";
+      riskFactors.push("Detak jantung meningkat (Tahap Waspada)");
+    }
+    if (metrics?.bloodSugar && parseInt(metrics.bloodSugar) > 140 && condition !== "Hiperglikemia") {
+      if (severity !== "Tinggi") severity = "Sedang";
+      riskFactors.push("Gula darah di atas normal (Pra-diabetes)");
+    }
+    if (metrics?.sleepDuration && parseFloat(metrics.sleepDuration) < 5) {
+      riskFactors.push("Kurang tidur (Insomnia)");
+    }
+
+    // --- REKOMENDASI FINAL ---
+    let recommendation = "Pantau perkembangan gejala Anda. Jika tidak kunjung membaik dalam 3 hari, segera konsultasi ke fasilitas kesehatan terdekat.";
+    if (severity === "Tinggi") {
+      recommendation = "KONDISI ANDA MENUNJUKKAN GEJALA YANG MEMBUTUHKAN PERHATIAN MEDIS SEGERA. Jangan abaikan gejala ini.";
+    }
+
+    return {
+      condition,
+      severity,
+      description: "Analisa berdasarkan protokol medis dasar. (Catatan: Sistem AI utama sedang tidak dapat diakses, maka digunakan logika manual berbasis kriteria ini sebagai alternatif).",
+      advice,
+      recommendation,
+      riskFactors: riskFactors,
+      medications
+    };
   };
 
   const handleSend = async () => {
@@ -136,14 +300,23 @@ export default function KonsultasiAIPage() {
       setMessages((prev) => [...prev, aiMessage]);
 
     } catch (error: any) {
-      const errorMessage: Message = {
+      // JIKA AI ERROR, GUNAKAN BOT MANUAL
+      console.warn("AI Down, switching to Manual Bot");
+      const manualData = getManualDiagnosis(userSymptoms, metrics);
+
+      const manualMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Maaf, terjadi kesalahan: ${error.message}`,
+        text: "AI Diagnosa sedang tidak dapat diakses. Berikut adalah analisa berdasarkan protokol standar:",
         sender: "ai",
         timestamp: new Date(),
-        type: "error"
+        type: "diagnosis",
+        diagnosisData: manualData,
+        symptoms: userSymptoms,
+        metrics: metrics,
+        isManual: true // Tandai ini sebagai hasil manual
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      
+      setMessages((prev) => [...prev, manualMessage]);
     } finally {
       setIsAnalyzing(false);
     }
@@ -186,18 +359,10 @@ export default function KonsultasiAIPage() {
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Server Error Response:", errorText);
         throw new Error(`Server Error ${res.status}: ${errorText}`);
       }
 
-      let result;
-      try {
-        result = await res.json();
-      } catch (e) {
-        const text = await res.text();
-        console.error("JSON Parse Error. Server returned:", text);
-        throw new Error(`Respon server tidak valid (bukan JSON). Isi: ${text.substring(0, 100)}...`);
-      }
+      const result = await res.json();
 
       if (result.success) {
         if (result.consultationId) {
@@ -287,7 +452,6 @@ export default function KonsultasiAIPage() {
                       : "bg-slate-800/60 backdrop-blur-sm text-slate-200 rounded-tl-sm border border-white/5"
                   }`}>
                     {msg.text}
-                    {/* TAMPILKAN WAKTU DENGAN suppressHydrationWarning AGAR ERROR HILANG */}
                     <div suppressHydrationWarning className={`text-[9px] mt-1 opacity-60 ${msg.sender === "user" ? "text-right text-cyan-50" : "text-left text-slate-500"}`}>
                       {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                     </div>
@@ -309,13 +473,26 @@ export default function KonsultasiAIPage() {
               {/* DIAGNOSIS CARD */}
               {msg.type === "diagnosis" && msg.diagnosisData && (
                 <div className="w-full bg-slate-800/40 backdrop-blur-md border border-white/5 rounded-3xl overflow-hidden shadow-2xl shadow-black/20 animate-fade-in">
-                  <div className="bg-gradient-to-r from-cyan-900/30 to-slate-900/30 p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  {/* Header Card - Warna beda jika manual */}
+                  <div className={`bg-gradient-to-r ${
+                    msg.isManual 
+                      ? "from-amber-900/30 to-slate-900/30 border-amber-500/20" 
+                      : "from-cyan-900/30 to-slate-900/30"
+                  } p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-start justify-between gap-4`}>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-                          <CheckCircle className="w-4 h-4" />
+                        <div className={`p-1.5 rounded-lg border ${
+                           msg.isManual 
+                            ? "bg-amber-500/10 border-amber-500/20 text-amber-400" 
+                            : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                        }`}>
+                          {msg.isManual ? <Stethoscope className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </div>
-                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Hasil Analisa AI</span>
+                        <span className={`text-xs font-bold uppercase tracking-widest ${
+                          msg.isManual ? "text-amber-400" : "text-cyan-400"
+                        }`}>
+                          {msg.isManual ? "Analisa Manual (Fallback)" : "Hasil Analisa AI"}
+                        </span>
                       </div>
                       <h3 className="text-xl font-bold text-white leading-tight">{msg.diagnosisData.condition}</h3>
                     </div>
@@ -421,63 +598,70 @@ export default function KonsultasiAIPage() {
         <div ref={messagesEndRef} className="h-4" />
       </main>
 
-      {/* INPUT AREA */}
+      {/* INPUT AREA - FOOTER */}
       <footer className="relative z-20 shrink-0 bg-[#0B1121]/95 backdrop-blur-xl border-t border-white/5">
-        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-3">
           
-          {/* --- FORMULIR KESEHATAN TAMBAHAN (OPSIONAL) --- */}
-          <div className="bg-slate-800/30 rounded-2xl p-4 border border-white/5 animate-fade-in-up">
-            <div className="flex items-center gap-2 text-[11px] text-cyan-400 mb-3 font-bold uppercase tracking-wider">
-              <Activity className="w-3 h-3" />
-              <span>Data Vital (Disimpan ke Database)</span>
-            </div>
+          {/* --- COLLAPSIBLE FORMULIR KESEHATAN (REDESIGN) --- */}
+          <div className="bg-slate-800/30 rounded-2xl border border-white/5 overflow-hidden transition-all duration-300">
+            <button 
+              onClick={() => setIsVitalsExpanded(!isVitalsExpanded)}
+              className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-cyan-400 transition-colors bg-slate-900/50 hover:bg-slate-800/50"
+            >
+              <div className="flex items-center gap-2">
+                <Activity className="w-3 h-3" />
+                <span>Data Vital (Opsional)</span>
+              </div>
+              {isVitalsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Heart className="h-4 w-4 text-rose-400 group-focus-within:text-rose-300" />
+            {/* AREA ISI FORM (DILIPAT) */}
+            {isVitalsExpanded && (
+              <div className="px-4 pb-4 animate-fade-in-up grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-white/5 pt-3">
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Heart className="h-4 w-4 text-rose-400 group-focus-within:text-rose-300" />
+                  </div>
+                  <input
+                    type="number"
+                    value={heartRate}
+                    onChange={(e) => setHeartRate(e.target.value)}
+                    placeholder="Detak Jantung (bpm)"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 transition-all"
+                  />
                 </div>
-                <input
-                  type="number"
-                  value={heartRate}
-                  onChange={(e) => setHeartRate(e.target.value)}
-                  placeholder="Detak Jantung (bpm)"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 transition-all"
-                />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Droplets className="h-4 w-4 text-blue-400 group-focus-within:text-blue-300" />
+                  </div>
+                  <input
+                    type="number"
+                    value={bloodSugar}
+                    onChange={(e) => setBloodSugar(e.target.value)}
+                    placeholder="Kadar Gula (mg/dL)"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                  />
+                </div>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Moon className="h-4 w-4 text-indigo-400 group-focus-within:text-indigo-300" />
+                  </div>
+                  <input
+                    type="number"
+                    value={sleepDuration}
+                    onChange={(e) => setSleepDuration(e.target.value)}
+                    placeholder="Durasi Tidur (Jam)"
+                    min="0"
+                    max="24"
+                    step="0.5"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span className="text-xs text-slate-500 font-medium">Jam</span>
+                  </div>
+                </div>
               </div>
-
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Droplets className="h-4 w-4 text-blue-400 group-focus-within:text-blue-300" />
-                </div>
-                <input
-                  type="number"
-                  value={bloodSugar}
-                  onChange={(e) => setBloodSugar(e.target.value)}
-                  placeholder="Kadar Gula (mg/dL)"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                />
-              </div>
-
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Moon className="h-4 w-4 text-indigo-400 group-focus-within:text-indigo-300" />
-                </div>
-                <input
-                  type="number"
-                  value={sleepDuration}
-                  onChange={(e) => setSleepDuration(e.target.value)}
-                  placeholder="Durasi Tidur (Jam)"
-                  min="0"
-                  max="24"
-                  step="0.5"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-xs text-slate-500 font-medium">Jam</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* --- QUICK SELECT DISEASE --- */}

@@ -17,7 +17,7 @@ export default function LoginPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -28,39 +28,45 @@ export default function LoginPage() {
     }
 
     try {
-      // Simulasi API Call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // 1. Panggil API ASLI (Bukan setTimeout lagi)
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-      // --- LOGIKA PENENTUAN ROLE ---
-      let role = "user";
-      if (email.includes("admin")) role = "admin";
-      else if (email.includes("dokter")) role = "dokter";
+      const data = await res.json();
 
-      // 1. SET COOKIE (Agar Middleware membaca jika ada)
-      document.cookie = "auth=true; path=/; SameSite=Lax; Max-Age=86400";
-      document.cookie = `role=${role}; path=/; SameSite=Lax; Max-Age=86400`;
-
-      // 2. SET LOCALSTORAGE (AGAR DASHBOARD MEMBACA INI)
-      // Ini penting agar Dashboard tidak menendang Anda kembali ke login
-      localStorage.setItem("token", "secure-token-123");
-      localStorage.setItem("user", JSON.stringify({
-        name: email.split("@")[0], // Ambil nama dari email (contoh: admin@gmail.com -> "admin")
-        email: email,
-        role: role
-      }));
-      
-      showToast("Login Berhasil! Mengalihkan...", "success");
-
-      setTimeout(() => {
-        let redirectUrl = "/user/dashboard-logged";
-        if (role === "admin") redirectUrl = "/admin";
-        else if (role === "dokter") redirectUrl = "/doctor";
+      if (res.ok) {
+        // 2. Ambil Role dari Response Database (ASLI)
+        const role = data.user.role; 
         
-        router.push(redirectUrl);
-      }, 1000);
+        // 3. Set LocalStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        
+        showToast("Login Berhasil!", "success");
+
+        setTimeout(() => {
+          let redirectUrl = "/user/dashboard-logged";
+          
+          // Redirect berdasarkan Role ASLI dari Database
+          if (role === "admin") {
+            redirectUrl = "/admin";
+          } else if (role === "dokter") {
+            redirectUrl = "/doctor";
+          }
+          
+          router.push(redirectUrl);
+        }, 1000);
+
+      } else {
+        // Handle Error dari Database (Password salah / User tidak ditemukan)
+        showToast(data.error || "Email atau kata sandi salah.", "error");
+      }
 
     } catch (err: any) {
-      showToast(err.message || "Terjadi kesalahan saat login.", "error");
+      showToast("Terjadi kesalahan koneksi.", "error");
     } finally {
       setLoading(false);
     }

@@ -122,6 +122,7 @@ export default function DoctorDashboard() {
   };
 
   // --- HANDLERS ---
+    // Di dalam DoctorDashboard.tsx
   const handleReply = async () => {
     const userChats = getChatsForUser(selectedUserId);
     if (!userChats || userChats.length === 0) return;
@@ -137,18 +138,19 @@ export default function DoctorDashboard() {
     setIsSending(true);
     
     try {
-      // 2. Kirim Balasan ke Database Real
-      const res = await fetch('/api/doctor/reply', {
-        method: 'POST',
+      // PASTIKAN URL INI SAMA DENGAN FILE API DI ATAS
+      const res = await fetch('/api/doctor/consultations', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: targetChat.id,
-          replyText: replyText
+          // ⚠️ Key ini harus sama dengan yang diterima API: doctor_reply
+          doctor_reply: replyText 
         })
       });
 
       if (res.ok) {
-        // Update local state instan
+        // Update state lokal agar UI langsung berubah
         setConsultations(prev => prev.map(c => 
           c.id === targetChat.id 
             ? { ...c, doctor_reply: replyText, status: 'replied' as 'replied' } 
@@ -157,9 +159,12 @@ export default function DoctorDashboard() {
         setReplyText("");
         addToast("✨ Balasan terkirim ke pasien!", "success");
       } else {
-        addToast("❌ Gagal mengirim balasan.", "error");
+        const err = await res.json();
+        console.error("Error API:", err);
+        addToast("❌ Gagal mengirim: " + (err.error || "Unknown error"), "error");
       }
     } catch (error) {
+      console.error(error);
       addToast("❌ Koneksi internet bermasalah.", "error");
     } finally {
       setIsSending(false);
